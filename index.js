@@ -135,6 +135,27 @@ app.use('/api/:nodeId', (req, res, next) => {
         console.log(`Proxy response: ${proxyRes.statusCode} for ${req.method} ${req.url}`);
       }
     },
+    onProxyRes: (proxyRes, req, res) => {
+      // Preserve content-type headers for files
+      if (req.path.includes('/files/get')) {
+        // Pass through original headers
+        const contentType = proxyRes.headers['content-type'];
+        if (contentType) {
+          res.setHeader('Content-Type', contentType);
+        }
+      }
+    },
+    onProxyReq: (proxyReq, req, res) => {
+      // Add custom headers
+      proxyReq.setHeader('X-Forwarded-By', 'Subworld-Proxy');
+      proxyReq.setHeader('X-Forwarded-Proto', 'https');
+      
+      // Log the proxied request if detailed logging is enabled
+      if (ENABLE_DETAILED_LOGGING) {
+        console.log(`Proxying to: ${targetHost}${req.path.replace(`/api/${nodeId}`, '')}`);
+      }
+    },
+    
     onError: (err, req, res) => {
       console.error(`Proxy error for ${req.method} ${req.url}:`, err);
       res.status(502).json({ 
