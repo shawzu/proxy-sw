@@ -136,12 +136,16 @@ app.use('/api/:nodeId', (req, res, next) => {
       }
     },
     onProxyRes: (proxyRes, req, res) => {
-      // Preserve content-type headers for files
+      // For binary data like files, ensure content-type is preserved
       if (req.path.includes('/files/get')) {
-        // Pass through original headers
-        const contentType = proxyRes.headers['content-type'];
-        if (contentType) {
-          res.setHeader('Content-Type', contentType);
+        // Log content type for debugging
+        console.log('File download content-type:', proxyRes.headers['content-type']);
+        
+        // Make sure we don't modify binary responses
+        if (proxyRes.headers['content-type'] && 
+            !proxyRes.headers['content-type'].includes('application/json')) {
+          // Do not transform binary data
+          delete proxyRes.headers['content-encoding'];
         }
       }
     },
