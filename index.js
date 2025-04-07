@@ -136,17 +136,22 @@ app.use('/api/:nodeId', (req, res, next) => {
       }
     },
     onProxyRes: (proxyRes, req, res) => {
-      // For binary data like files, ensure content-type is preserved
+      // Special handling for file downloads
       if (req.path.includes('/files/get')) {
-        // Log content type for debugging
         console.log('File download content-type:', proxyRes.headers['content-type']);
         
-        // Make sure we don't modify binary responses
-        if (proxyRes.headers['content-type'] && 
-            !proxyRes.headers['content-type'].includes('application/json')) {
-          // Do not transform binary data
-          delete proxyRes.headers['content-encoding'];
+        // Ensure the content-type is properly preserved
+        if (proxyRes.headers['content-type']) {
+          res.setHeader('Content-Type', proxyRes.headers['content-type']);
+        } else {
+          res.setHeader('Content-Type', 'application/octet-stream');
         }
+        
+        // Ensure we don't modify binary responses
+        delete proxyRes.headers['content-encoding'];
+        
+        // Disable any compression or transformation
+        res.setHeader('Content-Encoding', 'identity');
       }
     },
     onProxyReq: (proxyReq, req, res) => {
