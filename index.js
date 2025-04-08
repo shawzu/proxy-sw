@@ -179,12 +179,11 @@ app.use('/api/:nodeId', (req, res, next) => {
   proxy(req, res, next);
 });
 
-// Special endpoint for WebRTC signaling (prioritized)
-app.use('/rtc/signal', (req, res, next) => {
-  // Add headers to indicate high priority
+app.use('/voice', (req, res, next) => {
+  // Higher priority for voice calls
   req.headers['X-Priority'] = 'high';
   
-  // Forward to bootstrap node's RTC endpoint
+  // Always use the bootstrap node for voice calls
   const nodeId = 'bootstrap1';
   const nodeInfo = KNOWN_NODES[nodeId];
   
@@ -201,11 +200,11 @@ app.use('/rtc/signal', (req, res, next) => {
     target: targetHost,
     changeOrigin: true,
     pathRewrite: {
-      '^/rtc/signal': '/rtc/signal',
+      '^/voice': '/voice',
     },
-    proxyTimeout: 5000, // Short timeout for RTC signals
+    proxyTimeout: 5000, // Short timeout for voice data
     onError: (err, req, res) => {
-      console.error(`RTC signal proxy error:`, err);
+      console.error(`Voice proxy error:`, err);
       res.status(502).json({ error: 'Proxy error', message: err.message });
     }
   });
