@@ -179,6 +179,41 @@ app.use('/api/:nodeId', (req, res, next) => {
   proxy(req, res, next);
 });
 
+// Special endpoint for WebRTC signaling (prioritized)
+app.use('/rtc/signal', (req, res, next) => {
+  // Add headers to indicate high priority
+  req.headers['X-Priority'] = 'high';
+  
+  // Forward to bootstrap node's RTC endpoint
+  const nodeId = 'bootstrap1';
+  const nodeInfo = KNOWN_NODES[nodeId];
+  
+  if (!nodeInfo) {
+    return res.status(500).json({
+      error: 'Configuration error',
+      message: 'Bootstrap node not configured'
+    });
+  }
+  
+  // Target the bootstrap node with minimal latency
+  const targetHost = nodeInfo.apiAddress;
+  const proxy = createProxyMiddleware({
+    target: targetHost,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/rtc/signal': '/rtc/signal',
+    },
+    proxyTimeout: 5000, // Short timeout for RTC signals
+    onError: (err, req, res) => {
+      console.error(`RTC signal proxy error:`, err);
+      res.status(502).json({ error: 'Proxy error', message: err.message });
+    }
+  });
+  
+  proxy(req, res, next);
+});
+
+
 // Special endpoint for Subworld Node API endpoints
 app.use('/subworld/:endpoint', (req, res, next) => {
   // Default to bootstrap node for these calls
