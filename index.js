@@ -6,6 +6,8 @@
  */
 
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const rateLimit = require('express-rate-limit');
@@ -17,15 +19,27 @@ const ENABLE_DETAILED_LOGGING = process.env.ENABLE_DETAILED_LOGGING === 'true' |
 
 // Create Express app
 const app = express();
+const server = http.createServer(app);
+
+
+// Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: '*', // In production, restrict this to your app domains
+    methods: ['GET', 'POST'],
+  }
+});
+
 
 // Rate limiting to prevent abuse
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1500, // limit each IP to 100 requests per windowMs
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  max: 1500, // limit each IP to 1500 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' }
 });
+
 
 // Apply rate limiting to all routes
 app.use(limiter);
@@ -258,9 +272,183 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start the server 
-app.listen(PORT, HOST, () => {
+
+// Track connected users by their public key
+const connectedUsers = new Map();
+const activeCallSessions = new Map();
+
+io.on('connection', (socket) => {
+  console.log('New socket connection:', socket.id);
+  
+  // User registers with their public key
+  socket.on('register', (data) => {
+    const { publicKey } = data;
+    if (!publicKey) return;
+    
+    console.log(`User registered: ${publicKey} with socket ID: ${socket.id}`);
+    connectedUsers.set(publicKey, socket.id);
+    
+    // Send confirmation to client
+    socket.emit('registered', { success: true });
+    
+    // Clean up on disconnect
+    socket.on('disconnect', () => {
+      console.log(`User disconnected: ${publicKey}`);
+      connectedUsers.delete(publicKey);
+      
+      // End any active calls
+      for (const [callId, call] of activeCallSessions.entries()) {
+        if (call.caller === publicKey || call.recipient === publicKey) {
+          // Notify the other party that the call ended
+          const otherParty = call.caller === publicKey ? call.recipient : call.caller;
+          const otherSocket = io.sockets.sockets.get(connectedUsers.get(otherParty));
+          
+          if (otherSocket) {
+            otherSocket.emit('call_ended', { callId });
+          }
+          
+          activeCallSessions.delete(callId);
+        }
+      }
+    });
+  });
+  
+  // Call signaling
+  socket.on('call_request', (data) => {
+    const { callId, caller, recipient } = data;
+    console.log(`Call request from ${caller} to ${recipient}, callId: ${callId}`);
+    
+    const recipientSocketId = connectedUsers.get(recipient);
+    if (!recipientSocketId) {
+      // Recipient not connected
+      socket.emit('call_status', { 
+        callId, 
+        status: 'failed', 
+        reason: 'recipient_offline'
+      });
+      return;
+    }
+    
+    // Store call session
+    activeCallSessions.set(callId, {
+      caller,
+      recipient,
+      startTime: new Date().toISOString(),
+      status: 'ringing'
+    });
+    
+    // Notify recipient
+    const recipientSocket = io.sockets.sockets.get(recipientSocketId);
+    if (recipientSocket) {
+      recipientSocket.emit('incoming_call', {
+        callId,
+        caller,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Tell caller we're ringing the recipient
+      socket.emit('call_status', { callId, status: 'ringing' });
+    } else {
+      socket.emit('call_status', { callId, status: 'failed', reason: 'delivery_failed' });
+      activeCallSessions.delete(callId);
+    }
+  });
+  
+  // Call response (accept/reject)
+  socket.on('call_response', (data) => {
+    const { callId, response, recipient, caller } = data;
+    console.log(`Call response for ${callId}: ${response}`);
+    
+    const callSession = activeCallSessions.get(callId);
+    if (!callSession) {
+      console.log(`No active call session found for ${callId}`);
+      socket.emit('call_status', { callId, status: 'failed', reason: 'invalid_call_id' });
+      return;
+    }
+    
+    // Update call status
+    callSession.status = response === 'accepted' ? 'active' : 'rejected';
+    activeCallSessions.set(callId, callSession);
+    
+    // Get caller socket
+    const callerSocketId = connectedUsers.get(caller);
+    if (!callerSocketId) {
+      socket.emit('call_status', { callId, status: 'failed', reason: 'caller_offline' });
+      activeCallSessions.delete(callId);
+      return;
+    }
+    
+    const callerSocket = io.sockets.sockets.get(callerSocketId);
+    if (!callerSocket) {
+      socket.emit('call_status', { callId, status: 'failed', reason: 'caller_disconnected' });
+      activeCallSessions.delete(callId);
+      return;
+    }
+    
+    // Notify caller of response
+    callerSocket.emit('call_response', {
+      callId,
+      response,
+      recipient
+    });
+    
+    if (response === 'rejected') {
+      activeCallSessions.delete(callId);
+    }
+  });
+  
+  // WebRTC signaling between peers
+  socket.on('peer_signal', (data) => {
+    const { signal, callId, sender, recipient } = data;
+    console.log(`Signal for call ${callId} from ${sender} to ${recipient}`);
+    
+    const recipientSocketId = connectedUsers.get(recipient);
+    if (!recipientSocketId) {
+      socket.emit('signal_status', { callId, status: 'failed', reason: 'recipient_offline' });
+      return;
+    }
+    
+    const recipientSocket = io.sockets.sockets.get(recipientSocketId);
+    if (recipientSocket) {
+      recipientSocket.emit('peer_signal', {
+        signal,
+        callId,
+        sender
+      });
+    }
+  });
+  
+  // End call
+  socket.on('end_call', (data) => {
+    const { callId, userId } = data;
+    console.log(`End call request for ${callId} from ${userId}`);
+    
+    const callSession = activeCallSessions.get(callId);
+    if (!callSession) {
+      console.log(`No active call session found for ${callId}`);
+      return;
+    }
+    
+    // Get other participant
+    const otherParty = callSession.caller === userId ? callSession.recipient : callSession.caller;
+    const otherSocketId = connectedUsers.get(otherParty);
+    
+    if (otherSocketId) {
+      const otherSocket = io.sockets.sockets.get(otherSocketId);
+      if (otherSocket) {
+        otherSocket.emit('call_ended', { callId, by: userId });
+      }
+    }
+    
+    // Remove the call session
+    activeCallSessions.delete(callId);
+  });
+});
+
+// Start the server
+server.listen(PORT, HOST, () => {
   console.log(`Subworld Network Proxy running on ${HOST}:${PORT}`);
+  console.log(`Socket.io signaling server enabled`);
   console.log(`Detailed logging: ${ENABLE_DETAILED_LOGGING ? 'Enabled' : 'Disabled'}`);
   console.log(`Available nodes: ${Object.keys(KNOWN_NODES).join(', ')}`);
 });
