@@ -23,27 +23,41 @@ const TURN_PORT = process.env.TURN_PORT || 3478; // TURN server port
 const app = express();
 const server = http.createServer(app);
 
-// Create and configure TURN server
-const turnServer = new Turn({
-  // TURN server configuration
-  authMech: 'long-term',
-  credentials: {
-    username: "subworlduser", // Replace with a more secure username
-    password: "subworldpass"   // Replace with a strong password
-  },
-  realm: 'subworld.turn',
-  debugLevel: 'ERROR', // INFO, WARN, ERROR - use ERROR in production
-  listenPort: TURN_PORT
-});
-
-// Start the TURN server
-turnServer.start()
-  .then(() => {
-    console.log(`TURN server started on port ${TURN_PORT}`);
-  })
-  .catch(error => {
-    console.error('Failed to start TURN server:', error);
+try {
+  // Create and configure TURN server
+  const turnServer = new Turn({
+    // TURN server configuration
+    authMech: 'long-term',
+    credentials: {
+      username: "subworlduser", 
+      password: "subworldpass"   
+    },
+    realm: 'subworld.turn',
+    debugLevel: 'ERROR',
+    listenPort: TURN_PORT
   });
+
+  // Start the TURN server with proper error handling
+  if (typeof turnServer.start === 'function') {
+    const startResult = turnServer.start();
+    if (startResult && typeof startResult.then === 'function') {
+      startResult
+        .then(() => {
+          console.log(`TURN server started on port ${TURN_PORT}`);
+        })
+        .catch(error => {
+          console.error('Failed to start TURN server:', error);
+        });
+    } else {
+      console.log(`TURN server started on port ${TURN_PORT} (synchronous mode)`);
+    }
+  } else {
+    console.error('TURN server start method not available, running in proxy-only mode');
+  }
+} catch (error) {
+  console.error('Failed to initialize TURN server:', error);
+  console.log('Continuing in proxy-only mode without TURN functionality');
+}
 
 // Initialize Socket.io
 const io = new Server(server, {
