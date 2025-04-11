@@ -21,6 +21,7 @@ const TURN_PORT = process.env.TURN_PORT || 5349; // TURN server port
 
 // Create Express app
 const app = express();
+app.set('trust proxy', true);
 const server = http.createServer(app);
 
 try {
