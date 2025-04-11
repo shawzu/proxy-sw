@@ -289,6 +289,54 @@ app.use('/voice', (req, res, next) => {
   proxy(req, res, next);
 });
 
+// Group endpoints proxying
+app.use('/api/:nodeId/groups', (req, res, next) => {
+  const nodeId = req.params.nodeId;
+  
+  // Get node info based on nodeId
+  const nodeInfo = KNOWN_NODES[nodeId];
+  
+  if (!nodeInfo) {
+    return res.status(404).json({ 
+      error: 'Node not found', 
+      message: `Node ID '${nodeId}' is not registered with this proxy` 
+    });
+  }
+  
+  // Use API address for API calls
+  const targetHost = nodeInfo.apiAddress;
+  
+  // Create a proxy for group endpoints
+  const proxy = createProxyMiddleware({
+    target: targetHost,
+    changeOrigin: true,
+    pathRewrite: {
+      [`^/api/${nodeId}/groups`]: '/groups', // Remove the /api/nodeId prefix when forwarding
+    },
+    onProxyReq: (proxyReq, req, res) => {
+      // Add custom headers
+      proxyReq.setHeader('X-Forwarded-By', 'Subworld-Proxy');
+      proxyReq.setHeader('X-Forwarded-Proto', 'https');
+      
+      // Log the proxied request if detailed logging is enabled
+      if (ENABLE_DETAILED_LOGGING) {
+        console.log(`Proxying group request to: ${targetHost}${req.path.replace(`/api/${nodeId}/groups`, '/groups')}`);
+      }
+    },
+    onError: (err, req, res) => {
+      console.error(`Proxy error for group request ${req.method} ${req.url}:`, err);
+      res.status(502).json({ 
+        error: 'Proxy error', 
+        message: err.message,
+        nodeId: nodeId,
+        endpoint: req.path.replace(`/api/${nodeId}/groups`, '/groups')
+      });
+    }
+  });
+  
+  proxy(req, res, next);
+});
+
 // Special endpoint for Subworld Node API endpoints
 app.use('/subworld/:endpoint', (req, res, next) => {
   // Default to bootstrap node for these calls
