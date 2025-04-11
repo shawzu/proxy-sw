@@ -2,7 +2,7 @@
  * Subworld Network Proxy
  * 
  * This proxy server acts as a secure bridge between HTTPS clients
- * and HTTP Subworld network nodes.
+ * and HTTP Subworld network nodes, with integrated TURN server functionality.
  */
 
 const express = require('express');
@@ -11,16 +11,39 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const rateLimit = require('express-rate-limit');
+const Turn = require('node-turn'); // Add this import for TURN server
 
 // Configuration
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const ENABLE_DETAILED_LOGGING = process.env.ENABLE_DETAILED_LOGGING === 'true' || false;
+const TURN_PORT = process.env.TURN_PORT || 3478; // TURN server port
 
 // Create Express app
 const app = express();
 const server = http.createServer(app);
 
+// Create and configure TURN server
+const turnServer = new Turn({
+  // TURN server configuration
+  authMech: 'long-term',
+  credentials: {
+    username: "subworlduser", // Replace with a more secure username
+    password: "subworldpass"   // Replace with a strong password
+  },
+  realm: 'subworld.turn',
+  debugLevel: 'ERROR', // INFO, WARN, ERROR - use ERROR in production
+  listenPort: TURN_PORT
+});
+
+// Start the TURN server
+turnServer.start()
+  .then(() => {
+    console.log(`TURN server started on port ${TURN_PORT}`);
+  })
+  .catch(error => {
+    console.error('Failed to start TURN server:', error);
+  });
 
 // Initialize Socket.io
 const io = new Server(server, {
@@ -30,7 +53,6 @@ const io = new Server(server, {
   }
 });
 
-
 // Rate limiting to prevent abuse
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -39,7 +61,6 @@ const limiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' }
 });
-
 
 // Apply rate limiting to all routes
 app.use(limiter);
@@ -69,6 +90,34 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     version: '1.0.0'
   });
+});
+
+// New endpoint to get TURN server credentials
+app.get('/turn-credentials', (req, res) => {
+  // Get current server IP or domain
+  const serverUrl = req.get('host');
+  const protocol = req.protocol;
+  
+  // Create a username that expires after 24 hours (recommended for production)
+  // For simplicity, we're using a fixed username and password here
+  // In production, use time-limited credentials
+  
+  const credentials = {
+    iceServers: [
+      {
+        urls: [
+          `turn:${serverUrl}:${TURN_PORT}?transport=udp`,
+          `turn:${serverUrl}:${TURN_PORT}?transport=tcp`,
+        ],
+        username: "subworlduser",
+        credential: "subworldpass"
+      }
+      // No backup servers - using only our own TURN server
+    ],
+    ttl: 86400 // 24 hours in seconds
+  };
+  
+  res.status(200).json(credentials);
 });
 
 // Known nodes registry - expand this as needed
@@ -225,7 +274,6 @@ app.use('/voice', (req, res, next) => {
   
   proxy(req, res, next);
 });
-
 
 // Special endpoint for Subworld Node API endpoints
 app.use('/subworld/:endpoint', (req, res, next) => {
@@ -449,6 +497,7 @@ io.on('connection', (socket) => {
 server.listen(PORT, HOST, () => {
   console.log(`Subworld Network Proxy running on ${HOST}:${PORT}`);
   console.log(`Socket.io signaling server enabled`);
+  console.log(`TURN server running on port ${TURN_PORT}`);
   console.log(`Detailed logging: ${ENABLE_DETAILED_LOGGING ? 'Enabled' : 'Disabled'}`);
   console.log(`Available nodes: ${Object.keys(KNOWN_NODES).join(', ')}`);
 });
