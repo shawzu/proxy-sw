@@ -2,7 +2,7 @@
  * Subworld Network Proxy
  * 
  * This proxy server acts as a secure bridge between HTTPS clients
- * and HTTP Subworld network nodes, with integrated TURN server functionality.
+ * and HTTP Subworld network nodes, with integrated signaling functionality.
  */
 
 const express = require('express');
@@ -11,56 +11,16 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const rateLimit = require('express-rate-limit');
-const Turn = require('node-turn'); // Add this import for TURN server
 
 // Configuration
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const ENABLE_DETAILED_LOGGING = process.env.ENABLE_DETAILED_LOGGING === 'true' || false;
-const TURN_PORT = process.env.TURN_PORT || 3478; // TURN server port
 
 // Create Express app
 const app = express();
 app.set('trust proxy', true);
 const server = http.createServer(app);
-
-try {
-  // Create and configure TURN server
-  const turnServer = new Turn({
-    // TURN server configuration
-    authMech: 'long-term',
-    credentials: {
-      username: "subworlduser", 
-      password: "subworldpass"   
-    },
-    realm: 'subworld.turn',
-    debugLevel: 'ALL',
-    listenPort: TURN_PORT,
-    externalIps: ['134.209.228.151'], 
-    listeningIps: ['0.0.0.0'],
-  });
-
-  // Start the TURN server with proper error handling
-  if (typeof turnServer.start === 'function') {
-    const startResult = turnServer.start();
-    if (startResult && typeof startResult.then === 'function') {
-      startResult
-        .then(() => {
-          console.log(`TURN server started on port ${TURN_PORT}`);
-        })
-        .catch(error => {
-          console.error('Failed to start TURN server:', error);
-        });
-    } else {
-      console.log(`TURN server started on port ${TURN_PORT} (synchronous mode)`);
-    }
-  } else {
-    console.error('TURN server start method not available, running in proxy-only mode');
-  }
-} catch (error) {
-  console.error('Failed to initialize TURN server:', error);
-  console.log('Continuing in proxy-only mode without TURN functionality');
-}
 
 // Initialize Socket.io
 const io = new Server(server, {
@@ -111,24 +71,16 @@ app.get('/health', (req, res) => {
 
 // New endpoint to get TURN server credentials
 app.get('/turn-credentials', (req, res) => {
- 
-  const protocol = req.protocol;
-  
-  // Create a username that expires after 24 hours (recommended for production)
-  // For simplicity, we're using a fixed username and password here
-  // In production, use time-limited credentials
-  
   const credentials = {
     iceServers: [
       {
         urls: [
-          `turn:proxy.inhouses.xyz:${TURN_PORT}?transport=udp`,
-          `turn:proxy.inhouses.xyz:${TURN_PORT}?transport=tcp`,
+          'turn:relay1.expressturn.com:3478?transport=udp',
+          'turn:relay1.expressturn.com:3478?transport=tcp'
         ],
-        username: "subworlduser",
-        credential: "subworldpass"
+        username: 'efQX0LFAL6X57HSHIV',
+        credential: 'EUOrSrU4chhCfoRT'
       }
-      // No backup servers - using only our own TURN server
     ],
     ttl: 86400 // 24 hours in seconds
   };
@@ -213,8 +165,7 @@ app.use('/api/:nodeId', (req, res, next) => {
       if (ENABLE_DETAILED_LOGGING) {
         console.log(`Proxy response: ${proxyRes.statusCode} for ${req.method} ${req.url}`);
       }
-    },
-    onProxyRes: (proxyRes, req, res) => {
+
       // Special handling for file downloads
       if (req.path.includes('/files/get')) {
         console.log('File download content-type:', proxyRes.headers['content-type']);
@@ -233,17 +184,6 @@ app.use('/api/:nodeId', (req, res, next) => {
         res.setHeader('Content-Encoding', 'identity');
       }
     },
-    onProxyReq: (proxyReq, req, res) => {
-      // Add custom headers
-      proxyReq.setHeader('X-Forwarded-By', 'Subworld-Proxy');
-      proxyReq.setHeader('X-Forwarded-Proto', 'https');
-      
-      // Log the proxied request if detailed logging is enabled
-      if (ENABLE_DETAILED_LOGGING) {
-        console.log(`Proxying to: ${targetHost}${req.path.replace(`/api/${nodeId}`, '')}`);
-      }
-    },
-    
     onError: (err, req, res) => {
       console.error(`Proxy error for ${req.method} ${req.url}:`, err);
       res.status(502).json({ 
@@ -383,7 +323,6 @@ app.use('*', (req, res) => {
     message: 'The requested resource does not exist on this server'
   });
 });
-
 
 // Track connected users by their public key
 const connectedUsers = new Map();
@@ -561,7 +500,6 @@ io.on('connection', (socket) => {
 server.listen(PORT, HOST, () => {
   console.log(`Subworld Network Proxy running on ${HOST}:${PORT}`);
   console.log(`Socket.io signaling server enabled`);
-  console.log(`TURN server running on port ${TURN_PORT}`);
   console.log(`Detailed logging: ${ENABLE_DETAILED_LOGGING ? 'Enabled' : 'Disabled'}`);
   console.log(`Available nodes: ${Object.keys(KNOWN_NODES).join(', ')}`);
 });
