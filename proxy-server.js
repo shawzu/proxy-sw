@@ -111,8 +111,7 @@ app.get('/health', (req, res) => {
 
 // New endpoint to get TURN server credentials
 app.get('/turn-credentials', (req, res) => {
-  // Get current server IP or domain
-  const serverUrl = req.get('host');
+ 
   const protocol = req.protocol;
   
   // Create a username that expires after 24 hours (recommended for production)
@@ -123,8 +122,8 @@ app.get('/turn-credentials', (req, res) => {
     iceServers: [
       {
         urls: [
-          `turn:${serverUrl}:${TURN_PORT}?transport=udp`,
-          `turn:${serverUrl}:${TURN_PORT}?transport=tcp`,
+          `turn:134.209.228.151:${TURN_PORT}?transport=udp`,
+          `turn:134.209.228.151:${TURN_PORT}?transport=tcp`,
         ],
         username: "subworlduser",
         credential: "subworldpass"
