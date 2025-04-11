@@ -17,7 +17,7 @@ const Turn = require('node-turn'); // Add this import for TURN server
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const ENABLE_DETAILED_LOGGING = process.env.ENABLE_DETAILED_LOGGING === 'true' || false;
-const TURN_PORT = process.env.TURN_PORT || 3478; // TURN server port
+const TURN_PORT = process.env.TURN_PORT || 5349; // TURN server port
 
 // Create Express app
 const app = express();
@@ -34,7 +34,9 @@ try {
     },
     realm: 'subworld.turn',
     debugLevel: 'ERROR',
-    listenPort: TURN_PORT
+    listenPort: TURN_PORT,
+    externalIps: ['134.209.228.151'], 
+    listeningIps: ['0.0.0.0'],
   });
 
   // Start the TURN server with proper error handling
