@@ -34,7 +34,7 @@ try {
       password: "subworldpass"   
     },
     realm: 'subworld.turn',
-    debugLevel: 'ERROR',
+    debugLevel: 'ALL',
     listenPort: TURN_PORT,
     externalIps: ['134.209.228.151'], 
     listeningIps: ['0.0.0.0'],
@@ -122,8 +122,8 @@ app.get('/turn-credentials', (req, res) => {
     iceServers: [
       {
         urls: [
-          `turn:134.209.228.151:${TURN_PORT}?transport=udp`,
-          `turn:134.209.228.151:${TURN_PORT}?transport=tcp`,
+          `turn:proxy.inhouses.xyz:${TURN_PORT}?transport=udp`,
+          `turn:proxy.inhouses.xyz:${TURN_PORT}?transport=tcp`,
         ],
         username: "subworlduser",
         credential: "subworldpass"
