@@ -167,7 +167,7 @@ app.use('/api/:nodeId', (req, res, next) => {
       }
 
       // Special handling for file downloads
-      if (req.path.includes('/files/get')) {
+      if (req.path.includes('/files/get') || req.path.includes('/groups/files/get')) {
         console.log('File download content-type:', proxyRes.headers['content-type']);
 
         // Ensure the content-type is properly preserved
