@@ -33,7 +33,7 @@ const io = new Server(server, {
 // Rate limiting to prevent abuse
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1500, // limit each IP to 1500 requests per windowMs
+  max: 150000, // limit each IP to 1500 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' }
