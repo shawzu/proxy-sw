@@ -99,14 +99,14 @@ const KNOWN_NODES = {
     description: 'Primary bootstrap node (93.4.27.35)'
   }, */
   'bootstrap2': {
-    name: 'Bootstrap Node 2',
+    name: 'BootstrapNode2',
     address: 'http://167.71.11.170:8080', // P2P port
     apiAddress: 'http://167.71.11.170:8081', // API port
     isBootstrap: true,
     description: 'Secondary bootstrap node (167.71.11.170)'
   },
   'booststrap3': {
-    name: 'Bootstrap Node 3',
+    name: 'BootstrapNode3',
     address: 'http://178.62.199.31:8080', // P2P port
     apiAddress: 'http://178.62.199.31:8081', // API port
     isBootstrap: true,
@@ -217,7 +217,7 @@ app.use('/voice', (req, res, next) => {
   req.headers['X-Priority'] = 'high';
 
   // Always use the bootstrap node for voice calls
-  const nodeId = 'bootstrap1';
+  const nodeId = 'bootstrap2';
   const nodeInfo = KNOWN_NODES[nodeId];
 
   if (!nodeInfo) {
@@ -296,7 +296,7 @@ app.use('/api/:nodeId/groups', (req, res, next) => {
 // Special endpoint for Subworld Node API endpoints
 app.use('/subworld/:endpoint', (req, res, next) => {
   // Default to bootstrap node for these calls
-  const nodeId = 'bootstrap1';
+  const nodeId = 'bootstrap2';
   const nodeInfo = KNOWN_NODES[nodeId];
 
   if (!nodeInfo) {
