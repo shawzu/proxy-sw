@@ -91,13 +91,26 @@ app.get('/turn-credentials', (req, res) => {
 // Known nodes registry - expand this as needed
 const KNOWN_NODES = {
   'bootstrap1': {
-    name: 'Bootstrap Node',
+    name: 'Bootstrap Node 1',
     address: 'http://93.4.27.35:8080', // P2P port
     apiAddress: 'http://93.4.27.35:8081', // API port
     isBootstrap: true,
     description: 'Primary bootstrap node (93.4.27.35)'
-  }
-  // Add more nodes when available
+  }, 
+  'bootstrap2': {
+    name: 'Bootstrap Node 2',
+    address: 'http://167.71.11.170:8080', // P2P port
+    apiAddress: 'http://167.71.11.170:8081', // API port
+    isBootstrap: true,
+    description: 'Secondary bootstrap node (167.71.11.170)'
+  },
+  'booststrap3': {
+    name: 'Bootstrap Node 3',
+    address: 'http://178.62.199.31:8080', // P2P port
+    apiAddress: 'http://178.62.199.31:8081', // API port
+    isBootstrap: true,
+    description: 'Third bootstrap node (178.62.199.31)'
+  },
 };
 
 // Node info endpoint - returns available nodes list
