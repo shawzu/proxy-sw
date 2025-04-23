@@ -1,6 +1,6 @@
 # Subworld Proxy
 
-A customizable proxy for [Subworld](github.com/shawzu/subworld-network). This proxy allows you to connect your [Subworld Client](https://github.com/shawzu/subworld-client) to the Subworld network.
+A customizable proxy for [Subworld](https://github.com/shawzu/subworld-network). This proxy allows you to connect your [Subworld Client](https://github.com/shawzu/subworld-client) to the Subworld network.
 
 ## Installation
 
