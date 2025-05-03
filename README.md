@@ -6,8 +6,8 @@ A customizable proxy for [Subworld](https://github.com/shawzu/subworld-network).
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (recommended version: 14.x or higher)
-- [npm](https://www.npmjs.com/) (typically installed with Node.js)
+- [Node.js](https://nodejs.org/) 
+- [npm](https://www.npmjs.com/) 
 
 ### Installation Steps
 
